@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -72,6 +73,17 @@ func (c *Cache) Get(key string) (interface{}, bool)  {
 	return item.Value, true
 }
 
+func (c *Cache) GetAll() map[string]interface{}  {
+	c.RLock()
+	defer c.RUnlock()
+	allItems := make(map[string]interface{})
+	for k, v :=range c.items{
+		allItems[k] = v.Value
+		//fmt.Println(k, " ", v)
+	}
+	return allItems
+}
+
 func (c *Cache) Delete(key string) error{
 	c.Lock()
 	defer c.Unlock()
@@ -128,27 +140,32 @@ func (c *Cache) clearItems(keys []string)  {
 	}
 }
 
+const N  = 10
+
 func main() {
 	myCache := New(5 * time.Minute, 1 * time.Minute)
 
 	fmt.Println("Init count = ", myCache.Count()) // 0
 
-	myCache.Set("1",10, 1 * time.Minute)
-	myCache.Set("2",10, 2 * time.Minute)
-	myCache.Set("3",10, 3 * time.Minute)
+	go func() {
+		for i:=1;i<=10;i++{
+			myCache.Set(strconv.Itoa(i),i, time.Duration(i) * time.Minute)
+		}
+	}()
 
-	fmt.Println("After add 3 item = ", myCache.Count()) // 3
+	go func() {
+		for i:=11;i<=20;i++  {
+			myCache.Set(strconv.Itoa(i),i, time.Duration(i-10) * time.Minute)
+		}
+	}()
+
+
+	time.Sleep(3 * time.Second)
+	allItems := myCache.GetAll()
+	for k,v:=range allItems{
+		fmt.Printf("key -> %s : val -> %v\n", k, v)
+	}
 
 	fmt.Scanln()
-
-	//myCache.Delete("3")
-
-	fmt.Println("After 1 minute", myCache.Count()) // 2
-
-	fmt.Scanln()
-
-	//fmt.Println(myCache.Count()) // 1
-
-	//fmt.Scanln()
 }
 
